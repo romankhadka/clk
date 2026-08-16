@@ -69,24 +69,19 @@ export class Agents {
   init(w: number, h: number, now: number): void {
     const rand = mulberry32(0x9e3779b9);
     const c = CONFIG.wander;
-    const m = c.edgeMargin;
     for (let i = 0; i < this.capacity; i++) {
       this.rng[i] = (rand() * 4294967296) >>> 0 || 1;
       const j = i * 2;
-      this.pos[j] = -m + rand() * (w + m * 2);
-      this.pos[j + 1] = -m + rand() * (h + m * 2);
+      this.pos[j] = rand() * w;
+      this.pos[j + 1] = rand() * h;
       // lifelong speed property, log-uniform
       this.baseSpeed[i] =
         c.baseSpeedMin * Math.exp(Math.log(c.baseSpeedMax / c.baseSpeedMin) * rand());
-      if (rand() < c.stopChance) {
-        this.vel[j] = 0;
-        this.vel[j + 1] = 0;
-      } else {
-        const ang = rand() * TAU;
-        const speed = this.baseSpeed[i] * (1 - c.speedJitter + 2 * c.speedJitter * rand());
-        this.vel[j] = Math.cos(ang) * speed;
-        this.vel[j + 1] = Math.sin(ang) * speed;
-      }
+      // everyone sets off moving; only resters may pause later
+      const ang = rand() * TAU;
+      const speed = this.baseSpeed[i] * (1 - c.speedJitter + 2 * c.speedJitter * rand());
+      this.vel[j] = Math.cos(ang) * speed;
+      this.vel[j + 1] = Math.sin(ang) * speed;
       this.nextEventAt[i] = now + rand() * c.moveDurMax;
       this.state[i] = AgentState.Free;
 

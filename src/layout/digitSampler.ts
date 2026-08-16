@@ -1,11 +1,11 @@
 import { CONFIG } from '../config';
-import { GLYPHS, PITCH } from './glyphs';
+import { GLYPHS } from './glyphs';
 import { hashString, mulberry32 } from '../sim/rng';
 
-// Rasterize a glyph's matrix dots once at a fixed, screen-independent
-// resolution and stratified-sample them into block clusters. Deterministic
-// and index-stable per glyph — resize remapping relies on point k meaning
-// the same spot.
+// Rasterize a glyph's segments once at a fixed, screen-independent
+// resolution and stratified-sample them into a continuous fill of blocks.
+// Deterministic and index-stable per glyph — resize remapping relies on
+// point k meaning the same spot.
 export interface GlyphPoints {
   xy: Float32Array; // interleaved, glyph units (advance x 1.6, y down)
   weight: Float32Array; // 0..1 brightness weight
@@ -27,16 +27,9 @@ export function glyphPoints(ch: string): GlyphPoints {
   cv.width = wPx;
   cv.height = hPx;
   const ctx = cv.getContext('2d', { willReadFrequently: true })!;
-  const pitch = PITCH * RASTER;
-  const fill = CONFIG.digits.dotFill * pitch;
-  const inset = (pitch - fill) / 2;
   ctx.fillStyle = '#fff';
-  for (let r = 0; r < glyph.rows.length; r++) {
-    for (let col = 0; col < glyph.rows[r].length; col++) {
-      if (glyph.rows[r][col] === '1') {
-        ctx.fillRect(col * pitch + inset, r * pitch + inset, fill, fill);
-      }
-    }
+  for (const [x, y, w, h] of glyph.rects) {
+    ctx.fillRect(x * RASTER, y * RASTER, w * RASTER, h * RASTER);
   }
   const img = ctx.getImageData(0, 0, wPx, hPx).data;
 

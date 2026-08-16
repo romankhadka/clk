@@ -20,12 +20,12 @@ export const CONFIG = {
     baseSpeedMin: 10, // px/s; every block draws its own speed at creation
     baseSpeedMax: 60, // (log-uniform) and keeps it for life
     speedJitter: 0.25, // a block may only run within ±25% of its own speed
-    stopChance: 0.1, // brief rests, mostly roaming
-    stopDurMin: 2,
-    stopDurMax: 6,
+    restFraction: 0.05, // only this share of blocks is even allowed to stop
+    restChance: 0.4, // ...and they rest at this rate when deciding
+    restDurMin: 2,
+    restDurMax: 6,
     moveDurMin: 4,
     moveDurMax: 15,
-    edgeMargin: 8, // toroidal wrap happens this far offscreen
   },
 
   summon: {
@@ -46,9 +46,8 @@ export const CONFIG = {
     heightVmin: 26,
     heightMaxPx: 420,
     centerYFrac: 0.46,
-    gap: 0.28, // between glyphs, glyph units (just over one dot pitch)
+    gap: 0.28, // between glyphs, glyph units
     maxWidthFrac: 0.94, // shrink digits rather than overflow narrow screens
-    dotFill: 0.78, // matrix dot edge as a fraction of the dot pitch
     cellUnits: 0.036, // sampling cell in glyph units (~420 blocks per digit)
   },
 
