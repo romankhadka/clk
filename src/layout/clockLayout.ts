@@ -14,14 +14,17 @@ export function layoutClock(slots: string, w: number, h: number): Slot[] {
   const d = CONFIG.digits;
   const vmin = Math.min(w, h);
   const glyphH = Math.min(d.heightMaxPx, Math.max(d.heightMinPx, (d.heightVmin / 100) * vmin));
-  const scale = glyphH / 1.6; // px per glyph unit
-  const gap = d.gap * scale;
 
-  let totalW = -gap;
-  for (const ch of slots) totalW += GLYPHS[ch].advance * scale + gap;
+  let unitW = -d.gap;
+  for (const ch of slots) unitW += GLYPHS[ch].advance + d.gap;
+
+  // px per glyph unit, shrunk if the string would overflow a narrow screen
+  const scale = Math.min(glyphH / 1.6, (w * d.maxWidthFrac) / unitW);
+  const gap = d.gap * scale;
+  const totalW = unitW * scale;
 
   let x = (w - totalW) / 2;
-  const y = h * d.centerYFrac - glyphH / 2;
+  const y = h * d.centerYFrac - scale * 0.8; // vertical center of the 1.6-tall box
   const out: Slot[] = [];
   for (const ch of slots) {
     const gp = glyphPoints(ch);

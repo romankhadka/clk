@@ -49,8 +49,9 @@ export const CONFIG = {
     heightVmin: 26,
     heightMaxPx: 420,
     centerYFrac: 0.46,
-    gap: 0.18, // between glyphs, fraction of digit width
-    strokeFrac: 0.09, // stroke width as a fraction of glyph height
+    gap: 0.28, // between glyphs, glyph units (just over one dot pitch)
+    maxWidthFrac: 0.94, // shrink digits rather than overflow narrow screens
+    dotFill: 0.78, // matrix dot edge as a fraction of the dot pitch
     cellUnits: 0.036, // sampling cell in glyph units (~420 blocks per digit)
   },
 

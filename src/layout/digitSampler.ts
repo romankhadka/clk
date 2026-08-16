@@ -1,13 +1,14 @@
 import { CONFIG } from '../config';
-import { GLYPHS } from './glyphs';
+import { GLYPHS, PITCH } from './glyphs';
 import { hashString, mulberry32 } from '../sim/rng';
 
-// Rasterize a glyph once at a fixed, screen-independent resolution and
-// stratified-sample it into a constellation. Deterministic and index-stable
-// per glyph — resize remapping relies on point k meaning the same spot.
+// Rasterize a glyph's matrix dots once at a fixed, screen-independent
+// resolution and stratified-sample them into block clusters. Deterministic
+// and index-stable per glyph — resize remapping relies on point k meaning
+// the same spot.
 export interface GlyphPoints {
   xy: Float32Array; // interleaved, glyph units (advance x 1.6, y down)
-  weight: Float32Array; // 0..1 brightness weight, soft core-to-edge falloff
+  weight: Float32Array; // 0..1 brightness weight
   count: number;
 }
 
@@ -19,26 +20,28 @@ export function glyphPoints(ch: string): GlyphPoints {
   if (hit) return hit;
 
   const glyph = GLYPHS[ch];
-  const hU = 1.6;
-  const pad = Math.ceil(RASTER * 0.12);
-  const wPx = Math.ceil(glyph.advance * RASTER) + pad * 2;
-  const hPx = Math.ceil(hU * RASTER) + pad * 2;
+  const wPx = Math.ceil(glyph.advance * RASTER);
+  const hPx = Math.ceil(1.6 * RASTER);
 
   const cv = document.createElement('canvas');
   cv.width = wPx;
   cv.height = hPx;
   const ctx = cv.getContext('2d', { willReadFrequently: true })!;
-  ctx.translate(pad, pad);
-  ctx.scale(RASTER, RASTER);
-  ctx.lineWidth = CONFIG.digits.strokeFrac * hU;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = '#fff';
-  ctx.stroke(new Path2D(glyph.d));
+  const pitch = PITCH * RASTER;
+  const fill = CONFIG.digits.dotFill * pitch;
+  const inset = (pitch - fill) / 2;
+  ctx.fillStyle = '#fff';
+  for (let r = 0; r < glyph.rows.length; r++) {
+    for (let col = 0; col < glyph.rows[r].length; col++) {
+      if (glyph.rows[r][col] === '1') {
+        ctx.fillRect(col * pitch + inset, r * pitch + inset, fill, fill);
+      }
+    }
+  }
   const img = ctx.getImageData(0, 0, wPx, hPx).data;
 
   // one candidate point per grid cell, jittered, kept by dithered threshold —
-  // even coverage without clumps, organic rather than pixel-grid
+  // dots fill with an even, slightly ragged cluster of blocks
   const cell = CONFIG.digits.cellUnits * RASTER;
   const rand = mulberry32(hashString('glyph:' + ch));
   const xs: number[] = [];
@@ -54,7 +57,7 @@ export function glyphPoints(ch: string): GlyphPoints {
       const py = Math.min(hPx - 1, Math.max(0, Math.round((r + 0.5 + jy) * cell)));
       const alpha = img[(py * wPx + px) * 4 + 3] / 255;
       if (alpha <= th) continue;
-      xs.push(((c + 0.5 + jx) * cell - pad) / RASTER, ((r + 0.5 + jy) * cell - pad) / RASTER);
+      xs.push(((c + 0.5 + jx) * cell) / RASTER, ((r + 0.5 + jy) * cell) / RASTER);
       ws.push(0.55 + 0.45 * alpha);
     }
   }
