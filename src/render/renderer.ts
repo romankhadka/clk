@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import type { Agents } from '../sim/agents';
 import { initGL, resizeGL, makeProgram, makeTarget, destroyTarget, type GlCtx, type Target } from './gl';
 import { StarPass } from './starPass';
@@ -47,21 +48,27 @@ export class Renderer {
     gl.viewport(0, 0, pxW, pxH);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    // hold perceived field brightness steady across governor steps and
-    // viewport sizes: reference density is 200k stars on a 1440x900 window
-    const density = agents.drawCount / Math.max(1, cssW * cssH);
-    const fieldDim = Math.min(1.25, Math.max(0.6, Math.sqrt(0.154 / density)));
+    // block edge scales gently with the viewport; squares stay chunky and
+    // readable as individual blocks everywhere
+    const b = CONFIG.block;
+    const blockCss = Math.max(b.minPx, Math.min(b.maxPx, Math.round(Math.min(cssW, cssH) / b.vminPer)));
+    // hold perceived field brightness steady across governor steps, block
+    // sizes, and viewport sizes: reference is 15% screen coverage
+    const coverage = (agents.drawCount * blockCss * blockCss) / Math.max(1, cssW * cssH);
+    const fieldDim = Math.min(1.25, Math.max(0.6, Math.sqrt(0.15 / coverage)));
     this.stars.draw(
       agents,
       cssW,
       cssH,
-      Math.max(1, Math.round(dpr)),
+      Math.max(2, Math.round(blockCss * dpr)),
       time,
       this.encode,
       fieldDim,
     );
 
-    const bloomTex = this.bloom.run(scene, 0.06 * this.encode, 0.2 * this.encode);
+    // threshold sits above the wanderer ceiling: field blocks stay crisp
+    // squares, only the constellation blooms
+    const bloomTex = this.bloom.run(scene, 0.6 * this.encode, 0.3 * this.encode);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, pxW, pxH);
@@ -80,7 +87,7 @@ export class Renderer {
     gl.uniform1f(gl.getUniformLocation(this.composite, 'uDecode'), 1 / this.encode);
     gl.uniform1f(
       gl.getUniformLocation(this.composite, 'uBloomStrength'),
-      bloomTex ? 1.15 : 0.0,
+      bloomTex ? 0.8 : 0.0,
     );
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }

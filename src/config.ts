@@ -1,14 +1,20 @@
 // Every tunable in one place. Units are CSS px and seconds unless noted.
 export const CONFIG = {
-  capacity: 400_000, // allocation ceiling; buffers never resize
-  initialCount: 200_000, // adaptive governor moves between min/max
-  minCount: 100_000,
-  maxCount: 400_000,
+  capacity: 120_000, // allocation ceiling; buffers never resize
+  initialCount: 30_000, // adaptive governor moves between min/max
+  minCount: 12_000,
+  maxCount: 60_000,
   staticReserve: 4096, // indices [0, staticReserve) belong to the timezone label
-  summonPoolMax: 90_000, // summon candidates come from below this index, so
-  // governor trims (floor 100k) can never cut a digit holder
+  summonPoolMax: 11_000, // summon candidates come from below this index, so
+  // governor trims (floor 12k) can never cut a digit holder
 
   dprMax: 2,
+
+  block: {
+    minPx: 2, // CSS px, square edge on small screens
+    maxPx: 4, // and on very large ones
+    vminPer: 280, // edge = vmin / this, clamped
+  },
 
   wander: {
     speedMin: 2, // px/s, log-uniform
@@ -45,13 +51,14 @@ export const CONFIG = {
     centerYFrac: 0.46,
     gap: 0.18, // between glyphs, fraction of digit width
     strokeFrac: 0.09, // stroke width as a fraction of glyph height
-    cellUnits: 0.024, // sampling cell in glyph units (~950 points per digit)
+    cellUnits: 0.036, // sampling cell in glyph units (~420 blocks per digit)
   },
 
   label: {
     marginVmin: 4.5,
-    fontPx: 12, // target text height in CSS px
-    spacing: 1.2, // px between sampled label squares
+    fontPx: 26, // target text height in CSS px
+    weight: 700, // stroke must stay wider than the block spacing below
+    spacing: 2.9, // px between sampled label squares (~ one block apart)
   },
 
   quality: {

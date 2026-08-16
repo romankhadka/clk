@@ -1,16 +1,18 @@
 # clockwork
 
-A clock made of a few hundred thousand wandering stars.
+A clock made of tens of thousands of wandering blocks.
 
-Every square is a 1px autonomous agent with its own speed, direction, pauses,
-brightness, and twinkle. When the minute changes, a handful of free stars are
-summoned — each plots its own course to arrive at its constellation point
-within 10–15 seconds. Stars already sitting on a summoned position politely
-move out of the way. The timezone at the bottom never moves.
+**Live at [clock.romn.dev](https://clock.romn.dev).**
 
-Vanilla TypeScript + WebGL2, zero runtime dependencies. All squares render in
+Every block is an autonomous square agent with its own speed, direction,
+pauses, brightness, and twinkle. When the minute changes, a handful of free
+blocks are summoned — each plots its own course to arrive at its constellation
+point within 10–15 seconds. Blocks already sitting on a summoned position
+politely slide out of the way. The timezone at the bottom never moves.
+
+Vanilla TypeScript + WebGL2, zero runtime dependencies. All blocks render in
 a single `gl.POINTS` draw call; an adaptive governor scales the field between
-100k and 400k stars to hold 60fps on whatever hardware it lands on.
+12k and 60k blocks to hold 60fps on whatever hardware it lands on.
 
 ## Run
 

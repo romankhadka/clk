@@ -9,7 +9,7 @@ export function labelPoints(text: string, w: number, h: number): Float32Array {
   const fontPx = c.fontPx * ss;
 
   const cv = document.createElement('canvas');
-  const font = `300 ${fontPx}px system-ui, -apple-system, sans-serif`;
+  const font = `${c.weight} ${fontPx}px system-ui, -apple-system, sans-serif`;
   const setType = (ctx2: CanvasRenderingContext2D): void => {
     ctx2.font = font;
     if ('letterSpacing' in ctx2) {
