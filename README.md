@@ -1,8 +1,8 @@
-# clockwork
+# clk
 
 A clock made of tens of thousands of wandering blocks.
 
-**Live at [clock.romn.dev](https://clock.romn.dev).**
+**Live at [clk.romn.dev](https://clk.romn.dev).**
 
 Every block is an autonomous square agent with a lifelong speed property and
 its own direction, pauses, brightness, and twinkle. When the minute changes, a

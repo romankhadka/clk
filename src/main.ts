@@ -180,7 +180,7 @@ function boot(): void {
   });
 
   // dev/debug pulse
-  (window as unknown as Record<string, unknown>).__clockwork = {
+  (window as unknown as Record<string, unknown>).__clk = {
     get count() {
       return agents.drawCount;
     },
