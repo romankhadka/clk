@@ -17,24 +17,21 @@ export const CONFIG = {
   },
 
   wander: {
-    speedMin: 2, // px/s, log-uniform
-    speedMax: 14,
-    stopChance: 0.25,
-    stopDurMin: 3,
-    stopDurMax: 20,
-    moveDurMin: 2,
-    moveDurMax: 12,
+    baseSpeedMin: 10, // px/s; every block draws its own speed at creation
+    baseSpeedMax: 60, // (log-uniform) and keeps it for life
+    speedJitter: 0.25, // a block may only run within ±25% of its own speed
+    stopChance: 0.1, // brief rests, mostly roaming
+    stopDurMin: 2,
+    stopDurMax: 6,
+    moveDurMin: 4,
+    moveDurMax: 15,
     edgeMargin: 8, // toroidal wrap happens this far offscreen
   },
 
   summon: {
-    deadlineMin: 10,
-    deadlineMax: 15,
-    firstLoadMin: 2.5, // the very first clock forms faster
-    firstLoadMax: 6,
-    candidateK: 8, // best-of-K nearest candidate picking
-    noiseAmp: 12, // px of meander, decays as (1-u)^2 along the journey
-    resizeGlide: 0.8, // s, locked holders glide to re-laid-out targets
+    candidateK: 8, // best-of-K by travel time (distance / block speed)
+    firstLoadK: 16, // the very first clock picks from a wider pool
+    meanderFrac: 0.35, // lateral drift as a fraction of cruise, fades on approach
   },
 
   makeWay: {

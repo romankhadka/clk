@@ -63,8 +63,9 @@ export function stepWander(
         vel[j + 1] = 0;
         next[i] = now + c.stopDurMin + randF(rng, i) * (c.stopDurMax - c.stopDurMin);
       } else {
+        // roam at the block's own speed, modulated within its ±25% band
         const ang = randF(rng, i) * TAU;
-        const speed = c.speedMin * Math.exp(Math.log(c.speedMax / c.speedMin) * randF(rng, i));
+        const speed = a.baseSpeed[i] * (1 - c.speedJitter + 2 * c.speedJitter * randF(rng, i));
         vel[j] = Math.cos(ang) * speed;
         vel[j + 1] = Math.sin(ang) * speed;
         next[i] = now + c.moveDurMin + randF(rng, i) * (c.moveDurMax - c.moveDurMin);

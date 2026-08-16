@@ -4,11 +4,14 @@ A clock made of tens of thousands of wandering blocks.
 
 **Live at [clock.romn.dev](https://clock.romn.dev).**
 
-Every block is an autonomous square agent with its own speed, direction,
-pauses, brightness, and twinkle. When the minute changes, a handful of free
-blocks are summoned — each plots its own course to arrive at its constellation
-point within 10–15 seconds. Blocks already sitting on a summoned position
-politely slide out of the way. The timezone at the bottom never moves.
+Every block is an autonomous square agent with a lifelong speed property and
+its own direction, pauses, brightness, and twinkle. When the minute changes, a
+handful of free blocks are summoned — each cruises to its constellation point
+at its own pace (a block may only run within ±25% of its assigned speed), so a
+slow block picked far away genuinely takes its time crossing the canvas and
+the new time assembles gradually. Blocks already sitting on a summoned
+position politely slide out of the way. The timezone at the bottom never
+moves.
 
 Vanilla TypeScript + WebGL2, zero runtime dependencies. All blocks render in
 a single `gl.POINTS` draw call; an adaptive governor scales the field between

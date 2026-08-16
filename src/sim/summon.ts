@@ -5,13 +5,17 @@ import type { Slot } from '../layout/clockLayout';
 
 const TAU = Math.PI * 2;
 
-// Owns the constellation: which agent holds which target point, the travel
-// plans that get each one there by its own 10-15s deadline, and the glow
-// ramps that let digits ignite and dim without a single pop.
+// Owns the constellation: which block holds which target point, the journeys
+// that carry each one there at its own speed, and the glow ramps that let
+// digits ignite and dim without a single pop.
+//
+// Travel is physical: a summoned block cruises toward its target at a speed
+// chosen within ±25% of its lifelong speed property, so a slow block picked
+// far away genuinely takes its time crossing the canvas.
 export class Summoner {
   private slots: Slot[] = [];
   private holders: Int32Array[] = [];
-  private decaying: number[] = []; // freed agents easing their glow back to 0
+  private decaying: number[] = []; // freed blocks easing their glow back to 0
   private rand = mulberry32(0x51ed270b);
 
   currentSlots(): Slot[] {
@@ -19,22 +23,21 @@ export class Summoner {
   }
 
   // Full reconstellation: free everything, then summon the whole string.
-  rebuild(slots: Slot[], a: Agents, now: number, dlMin: number, dlMax: number): void {
+  rebuild(slots: Slot[], a: Agents, now: number, firstLoad = false): void {
     for (let s = 0; s < this.holders.length; s++) this.freeSlot(s, a, now);
     this.slots = slots;
-    this.holders = slots.map((slot) => this.summonSlot(slot, a, now, dlMin, dlMax));
+    this.holders = slots.map((slot) => this.summonSlot(slot, a, firstLoad));
   }
 
   // Minute tick with the same string length: only changed glyphs churn.
   diff(slots: Slot[], a: Agents, now: number): void {
-    const c = CONFIG.summon;
     for (let s = 0; s < slots.length; s++) {
       if (this.slots[s]?.ch === slots[s].ch) {
         this.holders[s] = this.holders[s] ?? new Int32Array(0);
         continue;
       }
       if (this.holders[s]) this.freeSlot(s, a, now);
-      this.holders[s] = this.summonSlot(slots[s], a, now, c.deadlineMin, c.deadlineMax);
+      this.holders[s] = this.summonSlot(slots[s], a, false);
     }
     this.slots = slots;
   }
@@ -47,7 +50,7 @@ export class Summoner {
     this.holders = slots.map((slot) => {
       const holders = new Int32Array(slot.count);
       for (let k = 0; k < slot.count; k++) {
-        const i = this.pick(a, slot.targets[k * 2], slot.targets[k * 2 + 1]);
+        const i = this.pick(a, slot.targets[k * 2], slot.targets[k * 2 + 1], CONFIG.summon.candidateK);
         holders[k] = i;
         if (i < 0) continue;
         a.state[i] = AgentState.Locked;
@@ -66,10 +69,10 @@ export class Summoner {
   }
 
   // Viewport changed: same glyphs, new geometry. Holder k maps to new target k
-  // (sampling is deterministic per glyph). Locked stars glide; travelers are
-  // re-anchored so their position is continuous and their deadline still lands.
-  remap(slots: Slot[], a: Agents, now: number): void {
-    const glide = CONFIG.summon.resizeGlide;
+  // (sampling is deterministic per glyph). Locked blocks travel to the new
+  // spot at their best pace; in-flight blocks simply re-aim.
+  remap(slots: Slot[], a: Agents): void {
+    const jit = CONFIG.wander.speedJitter;
     for (let s = 0; s < slots.length; s++) {
       const holders = this.holders[s];
       if (!holders) continue;
@@ -79,65 +82,55 @@ export class Summoner {
         if (i < 0) continue;
         const tx = slots[s].targets[k * 2];
         const ty = slots[s].targets[k * 2 + 1];
-        if (a.state[i] === AgentState.Locked) {
-          a.state[i] = AgentState.Summoned;
-          a.p0[i * 2] = a.pos[i * 2];
-          a.p0[i * 2 + 1] = a.pos[i * 2 + 1];
-          a.t0[i] = now;
-          a.tArrive[i] = now + glide;
-          a.glowFrom[i] = a.glow[i] / 254;
-        } else if (a.state[i] === AgentState.Summoned) {
-          const u = clamp01((now - a.t0[i]) / (a.tArrive[i] - a.t0[i]));
-          const s01 = smootherstep(u);
-          if (s01 > 0.9) {
-            a.p0[i * 2] = a.pos[i * 2];
-            a.p0[i * 2 + 1] = a.pos[i * 2 + 1];
-            a.t0[i] = now;
-            a.tArrive[i] = now + glide;
-            a.glowFrom[i] = a.glow[i] / 254;
-          } else {
-            // choose p0' so lerp(p0', tgt', u) equals the current position
-            a.p0[i * 2] = (a.pos[i * 2] - tx * s01) / (1 - s01);
-            a.p0[i * 2 + 1] = (a.pos[i * 2 + 1] - ty * s01) / (1 - s01);
-          }
-        }
         a.tgt[i * 2] = tx;
         a.tgt[i * 2 + 1] = ty;
+        const d = Math.hypot(tx - a.pos[i * 2], ty - a.pos[i * 2 + 1]);
+        if (a.state[i] === AgentState.Locked) {
+          a.state[i] = AgentState.Summoned;
+          a.cruise[i] = a.baseSpeed[i] * (1 + jit); // hurry, it was settled
+          a.glowFrom[i] = a.glow[i] / 254;
+        }
+        a.dist0[i] = Math.max(d, 1);
       }
     }
     this.slots = slots;
   }
 
-  // Advance travelers, settle arrivals, ease freed glows back down.
+  // Advance journeys, settle arrivals, ease freed glows back down.
   step(a: Agents, now: number, dt: number): void {
-    const noiseAmp = CONFIG.summon.noiseAmp;
+    const meander = CONFIG.summon.meanderFrac;
     let dirty = false;
     for (let s = 0; s < this.holders.length; s++) {
       const holders = this.holders[s];
       for (let k = 0; k < holders.length; k++) {
         const i = holders[k];
         if (i < 0 || a.state[i] !== AgentState.Summoned) continue;
-        const u = clamp01((now - a.t0[i]) / (a.tArrive[i] - a.t0[i]));
         const j = i * 2;
-        if (u >= 1) {
+        const dx = a.tgt[j] - a.pos[j];
+        const dy = a.tgt[j + 1] - a.pos[j + 1];
+        const dist = Math.hypot(dx, dy);
+        const step = a.cruise[i] * dt;
+        if (dist <= Math.max(step, 1.2)) {
           a.state[i] = AgentState.Locked;
           a.pos[j] = a.tgt[j];
           a.pos[j + 1] = a.tgt[j + 1];
           a.glow[i] = a.weight[i] * 254;
         } else {
-          const e = smootherstep(u);
-          const env = noiseAmp * (1 - u) * (1 - u);
+          // cruise toward the target with a lateral drift that fades in the
+          // final approach — a roaming path, not a laser line
+          const nx = dx / dist;
+          const ny = dy / dist;
           const ns = a.noiseSeed[i];
-          a.pos[j] =
-            a.p0[j] +
-            (a.tgt[j] - a.p0[j]) * e +
-            env * (Math.sin(now * 0.9 + ns) * 0.7 + Math.sin(now * 2.1 + ns * 2.3) * 0.3);
-          a.pos[j + 1] =
-            a.p0[j + 1] +
-            (a.tgt[j + 1] - a.p0[j + 1]) * e +
-            env * (Math.cos(now * 1.1 + ns * 1.7) * 0.7 + Math.cos(now * 2.4 + ns * 3.1) * 0.3);
-          // glow ramps toward the constellation weight, back-loaded so the
-          // digit visibly ignites as its stars settle
+          const lat =
+            a.cruise[i] *
+            meander *
+            Math.min(1, dist / 220) *
+            Math.sin(now * (0.6 + (ns % 1)) + ns);
+          a.pos[j] += (nx * a.cruise[i] - ny * lat) * dt;
+          a.pos[j + 1] += (ny * a.cruise[i] + nx * lat) * dt;
+          // glow ramps with progress so the digit visibly ignites as its
+          // blocks close in
+          const u = Math.max(0, Math.min(1, 1 - dist / a.dist0[i]));
           a.glow[i] = 254 * (a.glowFrom[i] + (a.weight[i] - a.glowFrom[i]) * u * u);
         }
         dirty = true;
@@ -152,7 +145,7 @@ export class Summoner {
         this.decaying.pop();
         continue;
       }
-      const g = a.glow[i] - dt * 170; // ~1.5s from full digit glow to plain star
+      const g = a.glow[i] - dt * 170; // ~1.5s from full digit glow to plain block
       if (g <= 0) {
         a.glow[i] = 0;
         this.decaying[d] = this.decaying[this.decaying.length - 1];
@@ -168,12 +161,13 @@ export class Summoner {
   private freeSlot(s: number, a: Agents, now: number): void {
     const holders = this.holders[s];
     if (!holders) return;
+    const jit = CONFIG.wander.speedJitter;
     for (let k = 0; k < holders.length; k++) {
       const i = holders[k];
       if (i < 0) continue;
       a.state[i] = AgentState.Free;
       const ang = this.rand() * TAU;
-      const sp = 4 + this.rand() * 8;
+      const sp = a.baseSpeed[i] * (1 - jit + 2 * jit * this.rand());
       a.vel[i * 2] = Math.cos(ang) * sp;
       a.vel[i * 2 + 1] = Math.sin(ang) * sp;
       a.nextEventAt[i] = now + 1 + this.rand() * 3;
@@ -182,27 +176,23 @@ export class Summoner {
     this.holders[s] = new Int32Array(0);
   }
 
-  private summonSlot(
-    slot: Slot,
-    a: Agents,
-    now: number,
-    dlMin: number,
-    dlMax: number,
-  ): Int32Array {
+  private summonSlot(slot: Slot, a: Agents, firstLoad: boolean): Int32Array {
+    const jit = CONFIG.wander.speedJitter;
+    const K = firstLoad ? CONFIG.summon.firstLoadK : CONFIG.summon.candidateK;
     const holders = new Int32Array(slot.count);
     for (let k = 0; k < slot.count; k++) {
       const tx = slot.targets[k * 2];
       const ty = slot.targets[k * 2 + 1];
-      const i = this.pick(a, tx, ty);
+      const i = this.pick(a, tx, ty, K);
       holders[k] = i;
       if (i < 0) continue;
       a.state[i] = AgentState.Summoned;
-      a.p0[i * 2] = a.pos[i * 2];
-      a.p0[i * 2 + 1] = a.pos[i * 2 + 1];
       a.tgt[i * 2] = tx;
       a.tgt[i * 2 + 1] = ty;
-      a.t0[i] = now + this.rand() * 0.8; // slight stagger in departures
-      a.tArrive[i] = a.t0[i] + dlMin + this.rand() * (dlMax - dlMin);
+      // the block sets its own pace for this journey, within its ±25% band
+      // (the very first clock hurries at the top of the band)
+      a.cruise[i] = a.baseSpeed[i] * (firstLoad ? 1 + jit : 1 - jit + 2 * jit * this.rand());
+      a.dist0[i] = Math.max(1, Math.hypot(tx - a.pos[i * 2], ty - a.pos[i * 2 + 1]));
       a.weight[i] = slot.weights[k];
       a.glowFrom[i] = a.glow[i] / 254;
       a.vel[i * 2] = 0;
@@ -211,14 +201,15 @@ export class Summoner {
     return holders;
   }
 
-  // Best-of-K: sample K random free agents, take the nearest. Soft distance
-  // bias with wide spatial spread, no spatial index needed.
-  private pick(a: Agents, tx: number, ty: number): number {
+  // Best-of-K by travel time: sample K random free blocks and take the one
+  // whose speed gets it there soonest. Slow far blocks still get picked
+  // sometimes; fast far blocks compete with slow near ones.
+  private pick(a: Agents, tx: number, ty: number, K: number): number {
     const lo = CONFIG.staticReserve;
     const span = Math.min(CONFIG.summonPoolMax, a.drawCount) - lo;
     let best = -1;
-    let bestD = Infinity;
-    for (let t = 0; t < CONFIG.summon.candidateK; t++) {
+    let bestT = Infinity;
+    for (let t = 0; t < K; t++) {
       let i = -1;
       for (let tries = 0; tries < 24; tries++) {
         const cand = lo + ((this.rand() * span) | 0);
@@ -230,21 +221,13 @@ export class Summoner {
       if (i < 0) continue;
       const dx = a.pos[i * 2] - tx;
       const dy = a.pos[i * 2 + 1] - ty;
-      const d = dx * dx + dy * dy;
-      if (d < bestD) {
-        bestD = d;
+      const travel = Math.hypot(dx, dy) / a.baseSpeed[i];
+      if (travel < bestT) {
+        bestT = travel;
         best = i;
       }
     }
     if (best >= 0) a.state[best] = AgentState.Summoned; // claim immediately
     return best;
   }
-}
-
-function clamp01(x: number): number {
-  return x < 0 ? 0 : x > 1 ? 1 : x;
-}
-
-function smootherstep(x: number): number {
-  return x * x * x * (x * (x * 6 - 15) + 10);
 }

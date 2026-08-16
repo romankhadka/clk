@@ -21,15 +21,15 @@ export class Agents {
   // CPU simulation state
   readonly pos: Float32Array; // xy interleaved, CSS px
   readonly vel: Float32Array; // xy interleaved, px/s
+  readonly baseSpeed: Float32Array; // px/s, the block's lifelong speed property
   readonly rng: Uint32Array; // per-agent xorshift32 state
   readonly nextEventAt: Float32Array; // sim time of the next wander decision
   readonly state: Uint8Array;
 
   // Travel plan — meaningful while Summoned
-  readonly p0: Float32Array; // xy interleaved, journey start
   readonly tgt: Float32Array; // xy interleaved, constellation point
-  readonly t0: Float32Array;
-  readonly tArrive: Float32Array;
+  readonly cruise: Float32Array; // px/s chosen for this journey (±25% of base)
+  readonly dist0: Float32Array; // journey length at summon time, for glow ramp
   readonly weight: Float32Array; // constellation brightness weight, 0..1
   readonly glowFrom: Float32Array; // glow at journey start (0 fresh, ~weight on re-glide)
   readonly noiseSeed: Float32Array;
@@ -49,13 +49,13 @@ export class Agents {
     const n = this.capacity;
     this.pos = new Float32Array(n * 2);
     this.vel = new Float32Array(n * 2);
+    this.baseSpeed = new Float32Array(n);
     this.rng = new Uint32Array(n);
     this.nextEventAt = new Float32Array(n);
     this.state = new Uint8Array(n);
-    this.p0 = new Float32Array(n * 2);
     this.tgt = new Float32Array(n * 2);
-    this.t0 = new Float32Array(n);
-    this.tArrive = new Float32Array(n);
+    this.cruise = new Float32Array(n);
+    this.dist0 = new Float32Array(n);
     this.weight = new Float32Array(n);
     this.glowFrom = new Float32Array(n);
     this.noiseSeed = new Float32Array(n);
@@ -75,12 +75,15 @@ export class Agents {
       const j = i * 2;
       this.pos[j] = -m + rand() * (w + m * 2);
       this.pos[j + 1] = -m + rand() * (h + m * 2);
+      // lifelong speed property, log-uniform
+      this.baseSpeed[i] =
+        c.baseSpeedMin * Math.exp(Math.log(c.baseSpeedMax / c.baseSpeedMin) * rand());
       if (rand() < c.stopChance) {
         this.vel[j] = 0;
         this.vel[j + 1] = 0;
       } else {
         const ang = rand() * TAU;
-        const speed = c.speedMin * Math.exp(Math.log(c.speedMax / c.speedMin) * rand());
+        const speed = this.baseSpeed[i] * (1 - c.speedJitter + 2 * c.speedJitter * rand());
         this.vel[j] = Math.cos(ang) * speed;
         this.vel[j + 1] = Math.sin(ang) * speed;
       }
