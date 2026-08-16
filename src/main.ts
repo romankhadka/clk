@@ -77,18 +77,20 @@ function boot(): void {
     now: number,
   ): void => {
     const s = timeSlots(new Date());
-    const slots = layoutClock(s, renderer.ctx.cssW, renderer.ctx.cssH);
     const c = CONFIG.summon;
-    if (mode === 'remap' && s === curStr) {
-      summoner.remap(slots, agents, now);
-    } else if (mode === 'materialize' || reduced) {
+    if (mode === 'remap' && !reduced) {
+      // glide current holders to the new geometry first; the minute may also
+      // have changed while the resize was debouncing, handled below
+      summoner.remap(layoutClock(curStr, renderer.ctx.cssW, renderer.ctx.cssH), agents, now);
+    }
+    const slots = layoutClock(s, renderer.ctx.cssW, renderer.ctx.cssH);
+    if (mode === 'materialize' || reduced) {
       summoner.materialize(slots, agents, now);
     } else if (mode === 'first') {
       summoner.rebuild(slots, agents, now, c.firstLoadMin, c.firstLoadMax);
-    } else if (s.length === curStr.length) {
-      summoner.diff(slots, agents, now);
-    } else {
-      summoner.rebuild(slots, agents, now, c.deadlineMin, c.deadlineMax);
+    } else if (s !== curStr) {
+      if (s.length === curStr.length) summoner.diff(slots, agents, now);
+      else summoner.rebuild(slots, agents, now, c.deadlineMin, c.deadlineMax);
     }
     makeWay.rebuild(slots);
     curStr = s;
