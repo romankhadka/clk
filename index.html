@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="A clock made of a few hundred thousand wandering stars."
+    />
+    <title>clockwork</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #04060c;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #fallback {
+        display: none;
+        position: fixed;
+        inset: 0;
+        color: #cdd8ff;
+        font-family: system-ui, sans-serif;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 0.5rem;
+        letter-spacing: 0.2em;
+      }
+      #fallback time {
+        font-size: 14vmin;
+        font-weight: 200;
+      }
+      #fallback small {
+        opacity: 0.55;
+        font-size: 1.6vmin;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="sky"></canvas>
+    <div id="fallback"><time></time><small></small></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
