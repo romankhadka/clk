@@ -159,16 +159,10 @@ function boot(): void {
     if (timeSlots(new Date()) !== curStr) buildClock('materialize', now);
   });
 
+  // reduced motion calms digit transitions (instant materialize) but never
+  // stops the field — the roaming blocks are the piece
   matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
     reduced = e.matches;
-    if (reduced) {
-      for (let i = CONFIG.staticReserve; i < agents.capacity; i++) {
-        if (agents.state[i] === AgentState.Free) {
-          agents.vel[i * 2] = 0;
-          agents.vel[i * 2 + 1] = 0;
-        }
-      }
-    }
   });
 
   canvas.addEventListener('webglcontextlost', (e) => {
@@ -215,7 +209,7 @@ function boot(): void {
       pendingCut = null;
     }
 
-    stepWander(agents, makeWay, now, dt, renderer.ctx.cssW, renderer.ctx.cssH, reduced);
+    stepWander(agents, makeWay, now, dt, renderer.ctx.cssW, renderer.ctx.cssH);
     summoner.step(agents, now, dt);
     renderer.render(agents, now);
 

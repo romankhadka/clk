@@ -12,6 +12,8 @@ const TAU = Math.PI * 2;
 // Blocks never stop: only a small rester minority (seed < restFraction) may
 // pause at a decision. Everyone else travels perpetually at a speed within
 // ±25% of their lifelong speed property, bouncing off the canvas edges.
+// (prefers-reduced-motion calms the digit transitions in summon.ts; the
+// field itself always roams — it is the whole point of the piece.)
 export function stepWander(
   a: Agents,
   mw: MakeWay,
@@ -19,7 +21,6 @@ export function stepWander(
   dt: number,
   w: number,
   h: number,
-  reduced: boolean,
 ): void {
   const c = CONFIG.wander;
   const pos = a.pos,
@@ -70,7 +71,7 @@ export function stepWander(
       next[i] = now + 0.6;
     } else if (now >= next[i]) {
       const rester = a.seed[i] < c.restFraction;
-      if (reduced || (rester && randF(rng, i) < c.restChance)) {
+      if (rester && randF(rng, i) < c.restChance) {
         vel[j] = 0;
         vel[j + 1] = 0;
         next[i] = now + c.restDurMin + randF(rng, i) * (c.restDurMax - c.restDurMin);
