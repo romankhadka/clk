@@ -14,6 +14,12 @@ const TAU = Math.PI * 2;
 // ±25% of their lifelong speed property, bouncing off the canvas edges.
 // (prefers-reduced-motion calms the digit transitions in summon.ts; the
 // field itself always roams — it is the whole point of the piece.)
+export interface Gravity {
+  x: number;
+  y: number;
+  strength: number; // 0..1, fades as the pointer arrives and leaves
+}
+
 export function stepWander(
   a: Agents,
   mw: MakeWay,
@@ -21,16 +27,61 @@ export function stepWander(
   dt: number,
   w: number,
   h: number,
+  grav: Gravity | null,
 ): void {
   const c = CONFIG.wander;
+  const g = CONFIG.cursor;
   const pos = a.pos,
     vel = a.vel,
     state = a.state,
     next = a.nextEventAt,
     rng = a.rng;
+
+  // cursor gravity, precomputed per frame
+  const gOn = grav !== null && grav.strength > 0.001;
+  const gR = gOn
+    ? Math.min(g.radiusMax, Math.max(g.radiusMin, (g.radiusVmin / 100) * Math.min(w, h)))
+    : 0;
+  const gR2 = gR * gR;
+  const gThresh = 1 - g.susceptible; // blocks above this seed feel the pull
+  const gX = grav?.x ?? 0;
+  const gY = grav?.y ?? 0;
+  const gAccel = (grav?.strength ?? 0) * g.pull * dt;
   for (let i = CONFIG.staticReserve; i < a.drawCount; i++) {
     if (state[i] !== AgentState.Free) continue;
     const j = i * 2;
+
+    // light gravity: curve susceptible blocks toward the cursor without
+    // letting them exceed their own speed band — the pull steers, it never
+    // makes a block faster than it is
+    if (gOn && a.seed[i] > gThresh) {
+      const dx = gX - pos[j];
+      const dy = gY - pos[j + 1];
+      const d2 = dx * dx + dy * dy;
+      if (d2 < gR2) {
+        const d = Math.sqrt(d2) || 1;
+        // full strength at the middle of the well, releasing at the rim and
+        // again at the core so blocks settle into a swarm, not a point
+        const rim = 1 - d / gR;
+        const core = Math.min(1, d / g.core);
+        const k = (gAccel * rim * rim * core) / d;
+        vel[j] += (dx - dy * g.swirl) * k;
+        vel[j + 1] += (dy + dx * g.swirl) * k;
+        const sp = Math.hypot(vel[j], vel[j + 1]);
+        const lo = a.baseSpeed[i] * (1 - c.speedJitter);
+        const hi = a.baseSpeed[i] * (1 + c.speedJitter);
+        if (sp > hi) {
+          vel[j] = (vel[j] / sp) * hi;
+          vel[j + 1] = (vel[j + 1] / sp) * hi;
+        } else if (sp < lo && sp > 0) {
+          vel[j] = (vel[j] / sp) * lo;
+          vel[j + 1] = (vel[j + 1] / sp) * lo;
+        }
+        // keep it in the swarm rather than snapping back to a random heading
+        if (next[i] < now + 0.5) next[i] = now + 0.5;
+      }
+    }
+
     let x = pos[j] + vel[j] * dt;
     let y = pos[j + 1] + vel[j + 1] * dt;
     // bounce off the canvas edges, speed unchanged

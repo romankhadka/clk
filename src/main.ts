@@ -1,6 +1,6 @@
 import { CONFIG } from './config';
 import { Agents, AgentState, DEATH_NEVER } from './sim/agents';
-import { stepWander } from './sim/wander';
+import { stepWander, type Gravity } from './sim/wander';
 import { Summoner } from './sim/summon';
 import { MakeWay } from './sim/makeway';
 import { mulberry32 } from './sim/rng';
@@ -165,6 +165,28 @@ function boot(): void {
     reduced = e.matches;
   });
 
+  // the cursor's gravity well: present while the pointer is over the canvas,
+  // easing in and out so it never snaps on
+  const gravity: Gravity = { x: 0, y: 0, strength: 0 };
+  let gravityWanted = 0;
+  const track = (e: PointerEvent): void => {
+    gravity.x = e.clientX;
+    gravity.y = e.clientY;
+    gravityWanted = 1;
+  };
+  window.addEventListener('pointermove', track, { passive: true });
+  window.addEventListener('pointerdown', track, { passive: true });
+  window.addEventListener('pointerleave', () => {
+    gravityWanted = 0;
+  });
+  window.addEventListener('pointercancel', () => {
+    gravityWanted = 0;
+  });
+  // a lifted finger takes its gravity with it; a mouse keeps hovering
+  window.addEventListener('pointerup', (e) => {
+    if (e.pointerType !== 'mouse') gravityWanted = 0;
+  });
+
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
     running = false;
@@ -209,7 +231,17 @@ function boot(): void {
       pendingCut = null;
     }
 
-    stepWander(agents, makeWay, now, dt, renderer.ctx.cssW, renderer.ctx.cssH);
+    const rate = gravityWanted > gravity.strength ? CONFIG.cursor.fadeIn : CONFIG.cursor.fadeOut;
+    gravity.strength += (gravityWanted - gravity.strength) * Math.min(1, rate * dt);
+    stepWander(
+      agents,
+      makeWay,
+      now,
+      dt,
+      renderer.ctx.cssW,
+      renderer.ctx.cssH,
+      gravity.strength > 0.001 ? gravity : null,
+    );
     summoner.step(agents, now, dt);
     renderer.render(agents, now);
 
