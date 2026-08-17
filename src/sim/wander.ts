@@ -31,6 +31,7 @@ export function stepWander(
 ): void {
   const c = CONFIG.wander;
   const g = CONFIG.cursor;
+  const scale = a.speedScale; // smaller canvas, slower field
   const pos = a.pos,
     vel = a.vel,
     state = a.state,
@@ -46,7 +47,8 @@ export function stepWander(
   const gThresh = 1 - g.susceptible; // blocks above this seed feel the pull
   const gX = grav?.x ?? 0;
   const gY = grav?.y ?? 0;
-  const gAccel = (grav?.strength ?? 0) * g.pull * dt;
+  // scaled too, so the well pulls in proportion to how fast the field runs
+  const gAccel = (grav?.strength ?? 0) * g.pull * scale * dt;
   for (let i = CONFIG.staticReserve; i < a.drawCount; i++) {
     if (state[i] !== AgentState.Free) continue;
     const j = i * 2;
@@ -68,8 +70,8 @@ export function stepWander(
         vel[j] += (dx - dy * g.swirl) * k;
         vel[j + 1] += (dy + dx * g.swirl) * k;
         const sp = Math.hypot(vel[j], vel[j + 1]);
-        const lo = a.baseSpeed[i] * (1 - c.speedJitter);
-        const hi = a.baseSpeed[i] * (1 + c.speedJitter);
+        const lo = a.baseSpeed[i] * scale * (1 - c.speedJitter);
+        const hi = a.baseSpeed[i] * scale * (1 + c.speedJitter);
         if (sp > hi) {
           vel[j] = (vel[j] / sp) * hi;
           vel[j + 1] = (vel[j + 1] / sp) * hi;
@@ -113,7 +115,7 @@ export function stepWander(
         dy = Math.sin(ra);
         len = 1;
       }
-      const sp = a.baseSpeed[i] * (1 - c.speedJitter + 2 * c.speedJitter * randF(rng, i));
+      const sp = a.baseSpeed[i] * scale * (1 - c.speedJitter + 2 * c.speedJitter * randF(rng, i));
       const ang = (randF(rng, i) - 0.5) * 0.8;
       const ca = Math.cos(ang);
       const sa = Math.sin(ang);
@@ -129,7 +131,8 @@ export function stepWander(
       } else {
         // new heading at the block's own speed, within its ±25% band
         const ang = randF(rng, i) * TAU;
-        const speed = a.baseSpeed[i] * (1 - c.speedJitter + 2 * c.speedJitter * randF(rng, i));
+        const speed =
+          a.baseSpeed[i] * scale * (1 - c.speedJitter + 2 * c.speedJitter * randF(rng, i));
         vel[j] = Math.cos(ang) * speed;
         vel[j + 1] = Math.sin(ang) * speed;
         next[i] = now + c.moveDurMin + randF(rng, i) * (c.moveDurMax - c.moveDurMin);

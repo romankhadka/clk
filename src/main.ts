@@ -1,5 +1,5 @@
 import { CONFIG } from './config';
-import { Agents, AgentState, DEATH_NEVER } from './sim/agents';
+import { Agents, AgentState, DEATH_NEVER, speedScaleFor } from './sim/agents';
 import { stepWander, type Gravity } from './sim/wander';
 import { Summoner } from './sim/summon';
 import { MakeWay } from './sim/makeway';
@@ -134,10 +134,21 @@ function boot(): void {
     const now = tNow();
     const sx = renderer.ctx.cssW / oldW;
     const sy = renderer.ctx.cssH / oldH;
+    // rotating a phone changes how fast the field should run; retune the
+    // velocities in flight instead of waiting for each block's next decision
+    const prevScale = agents.speedScale;
+    agents.speedScale = speedScaleFor(renderer.ctx.cssW, renderer.ctx.cssH);
+    const vs = agents.speedScale / prevScale;
     for (let i = CONFIG.staticReserve; i < agents.capacity; i++) {
       if (agents.state[i] === AgentState.Free) {
         agents.pos[i * 2] *= sx;
         agents.pos[i * 2 + 1] *= sy;
+        if (vs !== 1) {
+          agents.vel[i * 2] *= vs;
+          agents.vel[i * 2 + 1] *= vs;
+        }
+      } else if (vs !== 1 && agents.state[i] === AgentState.Summoned) {
+        agents.cruise[i] *= vs; // blocks already in flight, too
       }
     }
     assignLabel();
@@ -214,6 +225,20 @@ function boot(): void {
     },
     get time() {
       return curStr;
+    },
+    get speedScale() {
+      return agents.speedScale;
+    },
+    // mean speed of the roaming field, px/s as rendered
+    get meanSpeed() {
+      let sum = 0;
+      let n = 0;
+      for (let i = CONFIG.staticReserve; i < agents.drawCount; i++) {
+        if (agents.state[i] !== AgentState.Free) continue;
+        sum += Math.hypot(agents.vel[i * 2], agents.vel[i * 2 + 1]);
+        n++;
+      }
+      return n ? sum / n : 0;
     },
   };
 

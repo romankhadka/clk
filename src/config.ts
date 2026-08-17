@@ -20,6 +20,11 @@ export const CONFIG = {
     baseSpeedMin: 10, // px/s; every block draws its own speed at creation
     baseSpeedMax: 60, // (log-uniform) and keeps it for life
     speedJitter: 0.25, // a block may only run within ±25% of its own speed
+    // a small canvas is crossed far too quickly at desktop speeds, so the
+    // whole field scales with the viewport: half speed on a phone, full on
+    // a desktop, smoothly in between
+    scaleRefVmin: 900,
+    scaleMin: 0.5,
     restFraction: 0.05, // only this share of blocks is even allowed to stop
     restChance: 0.4, // ...and they rest at this rate when deciding
     restDurMin: 2,

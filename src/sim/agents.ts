@@ -11,6 +11,13 @@ export const enum AgentState {
 // Sentinel "never dies" timestamp for the death-fade channel.
 export const DEATH_NEVER = 1e9;
 
+// Blocks should take a comparable time to cross the canvas whatever its
+// size: full speed on a desktop, half on a phone.
+export function speedScaleFor(w: number, h: number): number {
+  const c = CONFIG.wander;
+  return Math.min(1, Math.max(c.scaleMin, Math.min(w, h) / c.scaleRefVmin));
+}
+
 const TAU = Math.PI * 2;
 
 // Structure-of-Arrays agent pool, allocated once at full capacity.
@@ -45,6 +52,10 @@ export class Agents {
 
   drawCount: number = CONFIG.initialCount;
 
+  // viewport-derived multiplier on every block's speed property; see
+  // speedScaleFor. Consumers read baseSpeed[i] * speedScale.
+  speedScale = 1;
+
   constructor() {
     const n = this.capacity;
     this.pos = new Float32Array(n * 2);
@@ -69,6 +80,7 @@ export class Agents {
   init(w: number, h: number, now: number): void {
     const rand = mulberry32(0x9e3779b9);
     const c = CONFIG.wander;
+    this.speedScale = speedScaleFor(w, h);
     for (let i = 0; i < this.capacity; i++) {
       this.rng[i] = (rand() * 4294967296) >>> 0 || 1;
       const j = i * 2;
@@ -79,7 +91,8 @@ export class Agents {
         c.baseSpeedMin * Math.exp(Math.log(c.baseSpeedMax / c.baseSpeedMin) * rand());
       // everyone sets off moving; only resters may pause later
       const ang = rand() * TAU;
-      const speed = this.baseSpeed[i] * (1 - c.speedJitter + 2 * c.speedJitter * rand());
+      const speed =
+        this.baseSpeed[i] * this.speedScale * (1 - c.speedJitter + 2 * c.speedJitter * rand());
       this.vel[j] = Math.cos(ang) * speed;
       this.vel[j + 1] = Math.sin(ang) * speed;
       this.nextEventAt[i] = now + rand() * c.moveDurMax;

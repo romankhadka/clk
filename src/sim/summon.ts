@@ -87,7 +87,7 @@ export class Summoner {
         const d = Math.hypot(tx - a.pos[i * 2], ty - a.pos[i * 2 + 1]);
         if (a.state[i] === AgentState.Locked) {
           a.state[i] = AgentState.Summoned;
-          a.cruise[i] = a.baseSpeed[i] * (1 + jit); // hurry, it was settled
+          a.cruise[i] = a.baseSpeed[i] * a.speedScale * (1 + jit); // hurry, it was settled
           a.glowFrom[i] = a.glow[i] / 254;
         }
         a.dist0[i] = Math.max(d, 1);
@@ -167,7 +167,7 @@ export class Summoner {
       if (i < 0) continue;
       a.state[i] = AgentState.Free;
       const ang = this.rand() * TAU;
-      const sp = a.baseSpeed[i] * (1 - jit + 2 * jit * this.rand());
+      const sp = a.baseSpeed[i] * a.speedScale * (1 - jit + 2 * jit * this.rand());
       a.vel[i * 2] = Math.cos(ang) * sp;
       a.vel[i * 2 + 1] = Math.sin(ang) * sp;
       a.nextEventAt[i] = now + 1 + this.rand() * 3;
@@ -191,7 +191,8 @@ export class Summoner {
       a.tgt[i * 2 + 1] = ty;
       // the block sets its own pace for this journey, within its ±25% band
       // (the very first clock hurries at the top of the band)
-      a.cruise[i] = a.baseSpeed[i] * (firstLoad ? 1 + jit : 1 - jit + 2 * jit * this.rand());
+      a.cruise[i] =
+        a.baseSpeed[i] * a.speedScale * (firstLoad ? 1 + jit : 1 - jit + 2 * jit * this.rand());
       a.dist0[i] = Math.max(1, Math.hypot(tx - a.pos[i * 2], ty - a.pos[i * 2 + 1]));
       a.weight[i] = slot.weights[k];
       a.glowFrom[i] = a.glow[i] / 254;
