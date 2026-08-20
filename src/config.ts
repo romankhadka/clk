@@ -39,16 +39,24 @@ export const CONFIG = {
     meanderFrac: 0.35, // lateral drift as a fraction of cruise, fades on approach
   },
 
-  // the cursor carries a light gravity: free blocks that happen to be
-  // susceptible curve toward it and mill around in a loose swarm
+  // the cursor gathers susceptible free blocks into a moving Saturn glyph:
+  // a round planet outline crossed by a tilted, gently layered ring
   cursor: {
-    susceptible: 0.34, // share of blocks that feel it (by stable seed)
-    radiusVmin: 30, // reach, as a percentage of vmin
-    radiusMin: 190, // px
-    radiusMax: 420,
-    pull: 120, // px/s^2 at the center of the well, easing to 0 at the rim
-    swirl: 0.9, // tangential share, so they orbit instead of spearing through
-    core: 62, // px; inside this the pull releases so they don't collapse
+    susceptible: 0.08, // enough members for a crisp, uncrowded glyph
+    radiusVmin: 12, // invisible capture reach, as a percentage of vmin
+    radiusMin: 90, // px; independent from the glyph's visual size
+    radiusMax: 120,
+    planetRadiusPx: 9.5,
+    ringMajorPx: 21,
+    ringMinorPx: 7.5,
+    ringSpreadPx: 1, // half-width of the layered ring band
+    ringTilt: -0.32, // radians in screen coordinates
+    ringShare: 0.64, // remaining members trace the round planet
+    approach: 3, // contour correction relative to orbital motion
+    settlePx: 2, // keep the compact contours crisp
+    steer: 9, // 1/s; quickly turns blocks onto the tight orbital paths
+    orbitSpeedMin: 5, // px/s; small paths need calm local speeds
+    orbitSpeedMax: 14,
     fadeIn: 4, // 1/s
     fadeOut: 1.6,
   },

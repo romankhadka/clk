@@ -180,19 +180,25 @@ function boot(): void {
   // easing in and out so it never snaps on
   const gravity: Gravity = { x: 0, y: 0, strength: 0 };
   let gravityWanted = 0;
+  const fadeGravity = (): void => {
+    gravityWanted = 0;
+  };
+  const releaseGravity = (): void => {
+    fadeGravity();
+    gravity.strength = 0;
+  };
   const track = (e: PointerEvent): void => {
     gravity.x = e.clientX;
     gravity.y = e.clientY;
-    gravityWanted = 1;
+    // Pointer moves can still be delivered to an unfocused window. Only a
+    // direct press may activate the well while focus is changing hands.
+    gravityWanted = e.type === 'pointerdown' || document.hasFocus() ? 1 : 0;
   };
   window.addEventListener('pointermove', track, { passive: true });
   window.addEventListener('pointerdown', track, { passive: true });
-  window.addEventListener('pointerleave', () => {
-    gravityWanted = 0;
-  });
-  window.addEventListener('pointercancel', () => {
-    gravityWanted = 0;
-  });
+  window.addEventListener('blur', releaseGravity);
+  window.addEventListener('pointerleave', fadeGravity);
+  window.addEventListener('pointercancel', fadeGravity);
   // a lifted finger takes its gravity with it; a mouse keeps hovering
   window.addEventListener('pointerup', (e) => {
     if (e.pointerType !== 'mouse') gravityWanted = 0;

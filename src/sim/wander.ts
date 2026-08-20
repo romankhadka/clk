@@ -38,7 +38,8 @@ export function stepWander(
     next = a.nextEventAt,
     rng = a.rng;
 
-  // cursor gravity, precomputed per frame
+  // Cursor Saturn field, precomputed per frame. Susceptible blocks split by
+  // stable seed between a circular planet outline and a tilted ring band.
   const gOn = grav !== null && grav.strength > 0.001;
   const gR = gOn
     ? Math.min(g.radiusMax, Math.max(g.radiusMin, (g.radiusVmin / 100) * Math.min(w, h)))
@@ -47,31 +48,106 @@ export function stepWander(
   const gThresh = 1 - g.susceptible; // blocks above this seed feel the pull
   const gX = grav?.x ?? 0;
   const gY = grav?.y ?? 0;
-  // scaled too, so the well pulls in proportion to how fast the field runs
-  const gAccel = (grav?.strength ?? 0) * g.pull * scale * dt;
+  const gStrength = grav?.strength ?? 0;
+  const ringCos = Math.cos(g.ringTilt);
+  const ringSin = Math.sin(g.ringTilt);
+  const planetR = g.planetRadiusPx;
+  const ringMajor = g.ringMajorPx;
+  const ringMinor = g.ringMinorPx;
+  const ringSpread = g.ringSpreadPx;
   for (let i = CONFIG.staticReserve; i < a.drawCount; i++) {
     if (state[i] !== AgentState.Free) continue;
     const j = i * 2;
 
-    // light gravity: curve susceptible blocks toward the cursor without
-    // letting them exceed their own speed band — the pull steers, it never
-    // makes a block faster than it is
+    // Follow the nearest point on the assigned contour. A tangential component
+    // keeps every block orbiting while the normal component gradually draws
+    // the swarm into a recognizable Saturn silhouette.
     if (gOn && a.seed[i] > gThresh) {
-      const dx = gX - pos[j];
-      const dy = gY - pos[j + 1];
+      const dx = pos[j] - gX;
+      const dy = pos[j + 1] - gY;
       const d2 = dx * dx + dy * dy;
       if (d2 < gR2) {
-        const d = Math.sqrt(d2) || 1;
-        // full strength at the middle of the well, releasing at the rim and
-        // again at the core so blocks settle into a swarm, not a point
-        const rim = 1 - d / gR;
-        const core = Math.min(1, d / g.core);
-        const k = (gAccel * rim * rim * core) / d;
-        vel[j] += (dx - dy * g.swirl) * k;
-        vel[j + 1] += (dy + dx * g.swirl) * k;
+        const member = (a.seed[i] - gThresh) / g.susceptible;
+        let correctionX: number;
+        let correctionY: number;
+        let tangentX: number;
+        let tangentY: number;
+        const contourSpeedScale = member < g.ringShare ? 1 : 0.8;
+
+        if (member < g.ringShare) {
+          // Rotate into the ring's local axes, then project radially onto one
+          // of many nearby ellipses so the ring reads as a fine layered band.
+          const lane = member / g.ringShare;
+          const major = ringMajor + (lane * 2 - 1) * ringSpread;
+          const minor = ringMinor + (lane * 2 - 1) * ringSpread;
+          const localX = dx * ringCos + dy * ringSin;
+          const localY = -dx * ringSin + dy * ringCos;
+          const q = Math.hypot(localX / major, localY / minor);
+          let targetX: number;
+          let targetY: number;
+          if (q < 0.001) {
+            const angle = lane * TAU * 13.0;
+            targetX = Math.cos(angle) * major;
+            targetY = Math.sin(angle) * minor;
+          } else {
+            targetX = localX / q;
+            targetY = localY / q;
+          }
+
+          const localCorrectionX = targetX - localX;
+          const localCorrectionY = targetY - localY;
+          correctionX = localCorrectionX * ringCos - localCorrectionY * ringSin;
+          correctionY = localCorrectionX * ringSin + localCorrectionY * ringCos;
+
+          // The ellipse gradient is normal to the contour; rotate it by 90°
+          // for a constant-direction orbital tangent.
+          let localTangentX = -targetY / (minor * minor);
+          let localTangentY = targetX / (major * major);
+          const tangentLength = Math.hypot(localTangentX, localTangentY) || 1;
+          localTangentX /= tangentLength;
+          localTangentY /= tangentLength;
+          tangentX = localTangentX * ringCos - localTangentY * ringSin;
+          tangentY = localTangentX * ringSin + localTangentY * ringCos;
+        } else {
+          const d = Math.sqrt(d2);
+          let radialX: number;
+          let radialY: number;
+          if (d < 0.001) {
+            const angle = member * TAU * 13.0;
+            radialX = Math.cos(angle);
+            radialY = Math.sin(angle);
+          } else {
+            radialX = dx / d;
+            radialY = dy / d;
+          }
+          correctionX = radialX * planetR - dx;
+          correctionY = radialY * planetR - dy;
+          tangentX = -radialY;
+          tangentY = radialX;
+        }
+
+        const correctionLength = Math.hypot(correctionX, correctionY);
+        const correctionWeight = Math.min(g.approach, correctionLength / g.settlePx);
+        let desiredX = tangentX;
+        let desiredY = tangentY;
+        if (correctionLength > 0.001) {
+          desiredX += (correctionX / correctionLength) * correctionWeight;
+          desiredY += (correctionY / correctionLength) * correctionWeight;
+        }
+        const desiredLength = Math.hypot(desiredX, desiredY) || 1;
+        const naturalSpeed =
+          a.baseSpeed[i] * scale * (1 - c.speedJitter + 2 * c.speedJitter * a.seed[i]);
+        const lo = g.orbitSpeedMin * contourSpeedScale;
+        const hi = g.orbitSpeedMax * contourSpeedScale;
+        const desiredSpeed = Math.min(hi, Math.max(lo, naturalSpeed));
+        desiredX = (desiredX / desiredLength) * desiredSpeed;
+        desiredY = (desiredY / desiredLength) * desiredSpeed;
+
+        const rim = 1 - Math.sqrt(d2) / gR;
+        const steer = Math.min(1, g.steer * gStrength * (0.7 + 0.3 * rim) * dt);
+        vel[j] += (desiredX - vel[j]) * steer;
+        vel[j + 1] += (desiredY - vel[j + 1]) * steer;
         const sp = Math.hypot(vel[j], vel[j + 1]);
-        const lo = a.baseSpeed[i] * scale * (1 - c.speedJitter);
-        const hi = a.baseSpeed[i] * scale * (1 + c.speedJitter);
         if (sp > hi) {
           vel[j] = (vel[j] / sp) * hi;
           vel[j + 1] = (vel[j + 1] / sp) * hi;
@@ -79,7 +155,7 @@ export function stepWander(
           vel[j] = (vel[j] / sp) * lo;
           vel[j + 1] = (vel[j + 1] / sp) * lo;
         }
-        // keep it in the swarm rather than snapping back to a random heading
+        // Keep it on the Saturn flow instead of accepting a wander decision.
         if (next[i] < now + 0.5) next[i] = now + 0.5;
       }
     }
