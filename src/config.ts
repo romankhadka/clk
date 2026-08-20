@@ -42,21 +42,21 @@ export const CONFIG = {
   // the cursor gathers susceptible free blocks into a moving Saturn glyph:
   // a round planet outline crossed by a tilted, gently layered ring
   cursor: {
-    susceptible: 0.08, // enough members for a crisp, uncrowded glyph
+    susceptible: 0.16, // preserve block density on the doubled contours
     radiusVmin: 12, // invisible capture reach, as a percentage of vmin
     radiusMin: 90, // px; independent from the glyph's visual size
     radiusMax: 120,
-    planetRadiusPx: 9.5,
-    ringMajorPx: 21,
-    ringMinorPx: 7.5,
-    ringSpreadPx: 1, // half-width of the layered ring band
+    planetRadiusPx: 19,
+    ringMajorPx: 42,
+    ringMinorPx: 15,
+    ringSpreadPx: 2, // half-width of the layered ring band
     ringTilt: -0.32, // radians in screen coordinates
     ringShare: 0.64, // remaining members trace the round planet
     approach: 3, // contour correction relative to orbital motion
     settlePx: 2, // keep the compact contours crisp
     steer: 9, // 1/s; quickly turns blocks onto the tight orbital paths
-    orbitSpeedMin: 5, // px/s; small paths need calm local speeds
-    orbitSpeedMax: 14,
+    orbitSpeedMin: 10, // px/s; doubled to preserve the orbital period
+    orbitSpeedMax: 28,
     fadeIn: 4, // 1/s
     fadeOut: 1.6,
   },
